@@ -5,7 +5,7 @@ import { FormEvent, useState } from "react";
 import { AuthPanel } from "@/components/auth-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiPost } from "@/lib/api";
+import { apiPost, setTokens } from "@/lib/api";
 
 type SignUpResponse = {
   data: {
@@ -39,7 +39,7 @@ export default function SignUpPage() {
           preferred_currency: "INR"
         }
       });
-      window.localStorage.setItem("nivra_tokens", JSON.stringify(payload.data.tokens));
+      setTokens(payload.data.tokens);
       if (payload.data.dev_email_verification_token) {
         setDevToken(payload.data.dev_email_verification_token);
       } else {

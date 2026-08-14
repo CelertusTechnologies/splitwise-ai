@@ -5,7 +5,7 @@ import { FormEvent, useState } from "react";
 import { AuthPanel } from "@/components/auth-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiPost } from "@/lib/api";
+import { apiPost, setTokens } from "@/lib/api";
 
 type AuthResponse = {
   data: {
@@ -36,7 +36,7 @@ export default function LoginPage() {
           password: form.get("password")
         }
       });
-      window.localStorage.setItem("nivra_tokens", JSON.stringify(payload.data.tokens));
+      setTokens(payload.data.tokens);
       window.location.assign("/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in");

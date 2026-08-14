@@ -1,5 +1,40 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
+export type Tokens = {
+  access_token: string;
+  refresh_token: string;
+};
+
+const TOKENS_KEY = "nivra_tokens";
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+export function getTokens(): Tokens | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(TOKENS_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Tokens;
+  } catch {
+    return null;
+  }
+}
+
+export function setTokens(tokens: Tokens): void {
+  window.localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens));
+}
+
+export function clearTokens(): void {
+  window.localStorage.removeItem(TOKENS_KEY);
+}
+
 type ApiOptions = {
   token?: string;
   body?: unknown;
@@ -18,7 +53,7 @@ export async function apiPost<T>(path: string, options: ApiOptions = {}): Promis
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     const message = payload?.error?.message ?? "Request failed";
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
 
   return payload as T;
@@ -32,9 +67,47 @@ export async function apiGet<T>(path: string, token?: string): Promise<T> {
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     const message = payload?.error?.message ?? "Request failed";
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
 
   return payload as T;
 }
 
+async function refreshTokens(): Promise<Tokens | null> {
+  const tokens = getTokens();
+  if (!tokens) return null;
+
+  try {
+    const payload = await apiPost<{ data: { tokens: Tokens } }>("/auth/refresh", {
+      body: { refresh_token: tokens.refresh_token }
+    });
+    setTokens(payload.data.tokens);
+    return payload.data.tokens;
+  } catch {
+    clearTokens();
+    return null;
+  }
+}
+
+/**
+ * GET a protected endpoint using the stored access token, transparently
+ * refreshing and retrying once if the access token has expired.
+ */
+export async function apiGetAuthed<T>(path: string): Promise<T> {
+  const tokens = getTokens();
+  if (!tokens) {
+    throw new ApiError("Not authenticated", 401);
+  }
+
+  try {
+    return await apiGet<T>(path, tokens.access_token);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      const refreshed = await refreshTokens();
+      if (refreshed) {
+        return await apiGet<T>(path, refreshed.access_token);
+      }
+    }
+    throw err;
+  }
+}
