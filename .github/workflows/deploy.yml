@@ -1,0 +1,39 @@
+name: Deploy Nivra to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.KEY }}
+          script: |
+            set -e
+            export PATH=$PATH:/usr/local/go/bin
+
+            cd ${{ secrets.PROJECT_PATH }}
+            git fetch origin main
+            git reset --hard origin/main
+
+            cd backend
+            go build -o bin/nivra-api ./cmd/api
+            cd ..
+
+            cd frontend
+            npm ci
+            npm run build
+            cd ..
+
+            pm2 startOrReload ecosystem.config.js --update-env
+            pm2 save
