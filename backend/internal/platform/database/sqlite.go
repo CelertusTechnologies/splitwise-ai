@@ -7,18 +7,23 @@ import (
 	"github.com/glebarez/sqlite"
 	"github.com/nivra/splitwise-ai/backend/internal/config"
 	authdomain "github.com/nivra/splitwise-ai/backend/internal/domain/auth"
+	groupdomain "github.com/nivra/splitwise-ai/backend/internal/domain/group"
 	userdomain "github.com/nivra/splitwise-ai/backend/internal/domain/user"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-// devModels are the tables required by the current (Phase 1 / auth) feature set.
-// Production uses the full SQL migration; SQLite dev mode auto-migrates only the
-// models that have Go definitions today and adds more as features land.
+// devModels are the tables required by the current feature set. Production
+// uses the full SQL migration; SQLite dev mode auto-migrates only the models
+// that have Go definitions today and adds more as features land.
 var devModels = []any{
 	&userdomain.User{},
 	&authdomain.RefreshToken{},
 	&authdomain.OneTimeToken{},
+	&authdomain.PhoneOTP{},
+	&groupdomain.Group{},
+	&groupdomain.Membership{},
+	&groupdomain.Invite{},
 }
 
 func connectSQLite(ctx context.Context, cfg config.Config, log *zap.Logger) (*gorm.DB, error) {

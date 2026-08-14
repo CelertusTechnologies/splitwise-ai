@@ -58,3 +58,28 @@ func (t *OneTimeToken) BeforeCreate(*gorm.DB) error {
 	}
 	return nil
 }
+
+// PhoneOTP is a short-lived numeric code sent to a phone number to log in or,
+// for a number with no existing account, to prove ownership before the
+// caller supplies the rest of the signup details.
+type PhoneOTP struct {
+	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	PhoneNumber  string     `gorm:"column:phone_number"`
+	CodeHash     string     `gorm:"column:code_hash"`
+	AttemptCount int        `gorm:"column:attempt_count"`
+	ExpiresAt    time.Time  `gorm:"column:expires_at"`
+	ConsumedAt   *time.Time `gorm:"column:consumed_at"`
+	CreatedAt    time.Time  `gorm:"column:created_at"`
+}
+
+func (PhoneOTP) TableName() string {
+	return "phone_otp_codes"
+}
+
+// BeforeCreate assigns a portable UUID primary key (see User.BeforeCreate).
+func (t *PhoneOTP) BeforeCreate(*gorm.DB) error {
+	if t.ID == uuid.Nil {
+		t.ID = uuid.New()
+	}
+	return nil
+}

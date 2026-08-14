@@ -11,6 +11,7 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./backend/migrations/000001_init.up.sql:/docker-entrypoint-initdb.d/000001_init.sql:ro
+      - ./backend/migrations/000002_phone_otp.up.sql:/docker-entrypoint-initdb.d/000002_phone_otp.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nivra -d nivra"]
       interval: 10s

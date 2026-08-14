@@ -13,6 +13,7 @@ import (
 type UserRepository interface {
 	Create(ctx context.Context, user *userdomain.User) error
 	FindByEmail(ctx context.Context, email string) (*userdomain.User, error)
+	FindByPhoneNumber(ctx context.Context, phoneNumber string) (*userdomain.User, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*userdomain.User, error)
 	UpdateLastLogin(ctx context.Context, id uuid.UUID, at time.Time) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
@@ -35,6 +36,17 @@ func (r *GormUserRepository) FindByEmail(ctx context.Context, email string) (*us
 	var found userdomain.User
 	err := r.db.WithContext(ctx).
 		Where("email = ? AND deleted_at IS NULL", email).
+		First(&found).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+	return &found, err
+}
+
+func (r *GormUserRepository) FindByPhoneNumber(ctx context.Context, phoneNumber string) (*userdomain.User, error) {
+	var found userdomain.User
+	err := r.db.WithContext(ctx).
+		Where("phone_number = ? AND deleted_at IS NULL", phoneNumber).
 		First(&found).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound

@@ -10,13 +10,14 @@ import (
 )
 
 type RouterDeps struct {
-	Config        config.Config
-	Logger        *zap.Logger
-	JWTManager    *security.JWTManager
-	AuthHandler   *handlers.AuthHandler
-	MeHandler     *handlers.MeHandler
-	HealthHandler *handlers.HealthHandler
-	GroupHandler  *handlers.GroupHandler
+	Config          config.Config
+	Logger          *zap.Logger
+	JWTManager      *security.JWTManager
+	AuthHandler     *handlers.AuthHandler
+	MeHandler       *handlers.MeHandler
+	HealthHandler   *handlers.HealthHandler
+	GroupHandler    *handlers.GroupHandler
+	PhoneOTPHandler *handlers.PhoneOTPHandler
 }
 
 func NewRouter(deps RouterDeps) *gin.Engine {
@@ -43,6 +44,13 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 			auth.POST("/forgot-password", deps.AuthHandler.ForgotPassword)
 			auth.POST("/reset-password", deps.AuthHandler.ResetPassword)
 			auth.POST("/verify-email", deps.AuthHandler.VerifyEmail)
+
+			otp := auth.Group("/otp")
+			{
+				otp.POST("/request", deps.PhoneOTPHandler.Request)
+				otp.POST("/verify", deps.PhoneOTPHandler.Verify)
+				otp.POST("/complete-signup", deps.PhoneOTPHandler.CompleteSignup)
+			}
 		}
 
 		users := v1.Group("/users")
