@@ -5,21 +5,18 @@ import { FormEvent, useState } from "react";
 import { AuthPanel } from "@/components/auth-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiPost, setTokens } from "@/lib/api";
+import { apiPost } from "@/lib/api";
 
 type SignUpResponse = {
   data: {
     dev_email_verification_token?: string;
-    tokens: {
-      access_token: string;
-      refresh_token: string;
-    };
   };
 };
 
 export default function SignUpPage() {
   const [error, setError] = useState("");
   const [devToken, setDevToken] = useState("");
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -39,17 +36,36 @@ export default function SignUpPage() {
           preferred_currency: "INR"
         }
       });
-      setTokens(payload.data.tokens);
       if (payload.data.dev_email_verification_token) {
         setDevToken(payload.data.dev_email_verification_token);
-      } else {
-        window.location.assign("/dashboard");
       }
+      setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to create account");
     } finally {
       setLoading(false);
     }
+  }
+
+  if (success) {
+    return (
+      <AuthPanel title="Account created" subtitle="You can now sign in with your email and password.">
+        <div className="grid gap-4">
+          {devToken ? (
+            <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
+              <p className="font-medium text-primary">Development verification token</p>
+              <code className="mt-2 block break-all text-xs text-foreground">{devToken}</code>
+              <Link className="mt-3 inline-block font-medium text-primary" href="/verify-email">
+                Verify email
+              </Link>
+            </div>
+          ) : null}
+          <Button asChild>
+            <Link href="/login">Go to login</Link>
+          </Button>
+        </div>
+      </AuthPanel>
+    );
   }
 
   return (
@@ -71,15 +87,6 @@ export default function SignUpPage() {
         <Input label="Phone number" name="phone_number" type="tel" autoComplete="tel" />
         <Input label="Password" name="password" type="password" autoComplete="new-password" required minLength={12} />
         {error ? <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">{error}</p> : null}
-        {devToken ? (
-          <div className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm">
-            <p className="font-medium text-primary">Development verification token</p>
-            <code className="mt-2 block break-all text-xs text-foreground">{devToken}</code>
-            <Link className="mt-3 inline-block font-medium text-primary" href="/verify-email">
-              Verify email
-            </Link>
-          </div>
-        ) : null}
         <Button type="submit" disabled={loading}>
           {loading ? "Creating account" : "Create account"}
         </Button>
@@ -87,4 +94,3 @@ export default function SignUpPage() {
     </AuthPanel>
   );
 }
-

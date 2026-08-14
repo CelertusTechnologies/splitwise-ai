@@ -16,6 +16,7 @@ type RouterDeps struct {
 	AuthHandler   *handlers.AuthHandler
 	MeHandler     *handlers.MeHandler
 	HealthHandler *handlers.HealthHandler
+	GroupHandler  *handlers.GroupHandler
 }
 
 func NewRouter(deps RouterDeps) *gin.Engine {
@@ -48,6 +49,16 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 		users.Use(middleware.AuthRequired(deps.JWTManager))
 		{
 			users.GET("/me", deps.MeHandler.GetMe)
+		}
+
+		groups := v1.Group("/groups")
+		groups.Use(middleware.AuthRequired(deps.JWTManager))
+		{
+			groups.POST("", deps.GroupHandler.Create)
+			groups.GET("", deps.GroupHandler.List)
+			groups.POST("/join", deps.GroupHandler.Join)
+			groups.GET("/:id", deps.GroupHandler.Get)
+			groups.POST("/:id/invites", deps.GroupHandler.CreateInvite)
 		}
 	}
 

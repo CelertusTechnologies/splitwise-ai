@@ -59,8 +59,12 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	oneTimeTokenRepo := repository.NewOneTimeTokenRepository(db)
+	groupRepo := repository.NewGroupRepository(db)
+	groupMembershipRepo := repository.NewGroupMembershipRepository(db)
+	groupInviteRepo := repository.NewGroupInviteRepository(db)
 
 	authService := service.NewAuthService(cfg, userRepo, refreshTokenRepo, oneTimeTokenRepo, jwtManager)
+	groupService := service.NewGroupService(groupRepo, groupMembershipRepo, groupInviteRepo)
 
 	router := httptransport.NewRouter(httptransport.RouterDeps{
 		Config:        cfg,
@@ -69,6 +73,7 @@ func main() {
 		AuthHandler:   handlers.NewAuthHandler(authService),
 		MeHandler:     handlers.NewMeHandler(userRepo),
 		HealthHandler: handlers.NewHealthHandler(db, redisClient),
+		GroupHandler:  handlers.NewGroupHandler(groupService, cfg.FrontendURL),
 	})
 
 	logger.Info("starting api", zap.String("port", cfg.Port))

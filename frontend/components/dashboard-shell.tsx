@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -19,25 +20,53 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { formatINR } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { apiGetAuthed } from "@/lib/api";
+
+type Group = {
+  id: string;
+  name: string;
+  group_type: string;
+  default_currency: string;
+};
 
 const navItems = [
-  { label: "Dashboard", icon: LayoutDashboard, available: true },
-  { label: "Groups", icon: UsersRound, available: false },
-  { label: "Expenses", icon: ReceiptText, available: false },
-  { label: "Settlements", icon: WalletCards, available: false },
-  { label: "Settings", icon: Settings, available: false }
-];
+  { label: "Dashboard", icon: LayoutDashboard, href: "/dashboard", available: true },
+  { label: "Groups", icon: UsersRound, href: "/groups", available: true },
+  { label: "Expenses", icon: ReceiptText, href: "/dashboard", available: false },
+  { label: "Settlements", icon: WalletCards, href: "/dashboard", available: false },
+  { label: "Settings", icon: Settings, href: "/dashboard", available: false }
+] as const;
 
-const metrics = [
-  { label: "Total owed", value: 0, helper: "Across 0 groups", tone: "text-primary", icon: ArrowDownRight },
-  { label: "You owe", value: 0, helper: "No settlements pending", tone: "text-danger", icon: ArrowUpRight },
-  { label: "Monthly spend", value: 0, helper: "No expenses logged yet", tone: "text-info", icon: TrendingUp },
-  { label: "Active groups", value: 0, helper: "Create your first group", tone: "text-accent", icon: UsersRound }
-];
+const mobileNavItems = [
+  { label: "Home", icon: LayoutDashboard, href: "/dashboard", available: true },
+  { label: "Groups", icon: UsersRound, href: "/groups", available: true },
+  { label: "Add", icon: Plus, href: "/dashboard", available: false },
+  { label: "Settle", icon: WalletCards, href: "/dashboard", available: false }
+] as const;
 
 export function DashboardShell() {
   const { user, logout } = useAuth();
+  const [groups, setGroups] = useState<Group[] | null>(null);
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short" });
+
+  useEffect(() => {
+    apiGetAuthed<{ data: { groups: Group[] } }>("/groups")
+      .then((payload) => setGroups(payload.data.groups))
+      .catch(() => setGroups([]));
+  }, []);
+
+  const metrics = [
+    { label: "Total owed", value: 0, helper: `Across ${groups?.length ?? 0} groups`, tone: "text-primary", icon: ArrowDownRight },
+    { label: "You owe", value: 0, helper: "No settlements pending", tone: "text-danger", icon: ArrowUpRight },
+    { label: "Monthly spend", value: 0, helper: "No expenses logged yet", tone: "text-info", icon: TrendingUp },
+    {
+      label: "Active groups",
+      value: groups?.length ?? 0,
+      helper: groups?.length ? "View them all" : "Create your first group",
+      tone: "text-accent",
+      icon: UsersRound
+    }
+  ];
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -56,7 +85,7 @@ export function DashboardShell() {
           {navItems.map((item) => (
             <Link
               key={item.label}
-              href="/dashboard"
+              href={item.href}
               aria-disabled={!item.available}
               onClick={(event) => {
                 if (!item.available) event.preventDefault();
@@ -100,9 +129,11 @@ export function DashboardShell() {
                 <Bell aria-hidden className="h-4 w-4" />
               </Button>
               <ThemeToggle />
-              <Button className="hidden md:inline-flex" disabled title="Group and expense creation is coming soon">
-                <Plus aria-hidden className="h-4 w-4" />
-                Add expense
+              <Button asChild className="hidden md:inline-flex">
+                <Link href="/groups">
+                  <Plus aria-hidden className="h-4 w-4" />
+                  New group
+                </Link>
               </Button>
               <Button variant="secondary" size="icon" aria-label="Log out" title="Log out" onClick={logout} className="lg:hidden">
                 <LogOut aria-hidden className="h-4 w-4" />
@@ -142,17 +173,46 @@ export function DashboardShell() {
           <section className="rounded-lg border border-border bg-surface p-4 shadow-panel lg:col-span-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-semibold">Active groups</h2>
-                <p className="text-sm text-muted">Balances that changed recently</p>
+                <h2 className="text-base font-semibold">Your groups</h2>
+                <p className="text-sm text-muted">
+                  {groups?.length ? "Open a group to invite people" : "Nothing here yet"}
+                </p>
               </div>
+              {groups?.length ? (
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/groups">View all</Link>
+                </Button>
+              ) : null}
             </div>
-            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-8 text-center">
-              <UsersRound aria-hidden className="h-6 w-6 text-muted" />
-              <p className="text-sm text-muted">You're not in any groups yet.</p>
-              <Button variant="secondary" size="sm" disabled title="Group creation is coming soon">
-                Create a group
-              </Button>
-            </div>
+            {groups === null ? (
+              <p className="text-sm text-muted">Loading…</p>
+            ) : groups.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-8 text-center">
+                <UsersRound aria-hidden className="h-6 w-6 text-muted" />
+                <p className="text-sm text-muted">You&apos;re not in any groups yet.</p>
+                <Button variant="secondary" size="sm" asChild>
+                  <Link href="/groups">Create a group</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {groups.slice(0, 4).map((group) => (
+                  <Link
+                    key={group.id}
+                    href={`/groups/${group.id}`}
+                    className="flex items-center justify-between gap-3 border-b border-border pb-3 last:border-0 last:pb-0"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="h-10 w-10 shrink-0 rounded-lg bg-primary" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">{group.name}</span>
+                        <span className="block text-xs capitalize text-muted">{group.group_type}</span>
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="rounded-lg border border-border bg-surface p-4 shadow-panel lg:col-span-6">
@@ -170,22 +230,17 @@ export function DashboardShell() {
               <h2 className="text-base font-semibold">Activity</h2>
             </div>
             <div className="flex items-center rounded-lg bg-background px-3 py-6 text-sm text-muted">
-              No activity yet. Once you add expenses or settle up, it'll show here.
+              No activity yet. Once you add expenses or settle up, it&apos;ll show here.
             </div>
           </section>
         </div>
       </section>
 
       <nav className="fixed inset-x-0 bottom-0 grid grid-cols-4 border-t border-border bg-surface px-2 py-2 lg:hidden">
-        {[
-          { label: "Home", icon: LayoutDashboard, available: true },
-          { label: "Groups", icon: UsersRound, available: false },
-          { label: "Add", icon: Plus, available: false },
-          { label: "Settle", icon: WalletCards, available: false }
-        ].map((item) => (
+        {mobileNavItems.map((item) => (
           <Link
             key={item.label}
-            href="/dashboard"
+            href={item.href}
             aria-disabled={!item.available}
             onClick={(event) => {
               if (!item.available) event.preventDefault();

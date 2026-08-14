@@ -5,7 +5,7 @@ import { FormEvent, useState } from "react";
 import { AuthPanel } from "@/components/auth-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiPost, setTokens } from "@/lib/api";
+import { apiPost, getPendingInvite, setTokens } from "@/lib/api";
 
 type AuthResponse = {
   data: {
@@ -37,7 +37,8 @@ export default function LoginPage() {
         }
       });
       setTokens(payload.data.tokens);
-      window.location.assign("/dashboard");
+      const pendingInvite = getPendingInvite();
+      window.location.assign(pendingInvite ? `/join/${pendingInvite}` : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to sign in");
     } finally {

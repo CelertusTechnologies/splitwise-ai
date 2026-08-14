@@ -5,7 +5,7 @@ type AuthPanelProps = {
   title: string;
   subtitle: string;
   children: React.ReactNode;
-  footer: React.ReactNode;
+  footer?: React.ReactNode;
 };
 
 export function AuthPanel({ title, subtitle, children, footer }: AuthPanelProps) {

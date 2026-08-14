@@ -35,6 +35,21 @@ export function clearTokens(): void {
   window.localStorage.removeItem(TOKENS_KEY);
 }
 
+const PENDING_INVITE_KEY = "nivra_pending_invite";
+
+export function setPendingInvite(code: string): void {
+  window.localStorage.setItem(PENDING_INVITE_KEY, code);
+}
+
+export function getPendingInvite(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(PENDING_INVITE_KEY);
+}
+
+export function clearPendingInvite(): void {
+  window.localStorage.removeItem(PENDING_INVITE_KEY);
+}
+
 type ApiOptions = {
   token?: string;
   body?: unknown;
@@ -106,6 +121,29 @@ export async function apiGetAuthed<T>(path: string): Promise<T> {
       const refreshed = await refreshTokens();
       if (refreshed) {
         return await apiGet<T>(path, refreshed.access_token);
+      }
+    }
+    throw err;
+  }
+}
+
+/**
+ * POST to a protected endpoint using the stored access token, transparently
+ * refreshing and retrying once if the access token has expired.
+ */
+export async function apiPostAuthed<T>(path: string, body?: unknown): Promise<T> {
+  const tokens = getTokens();
+  if (!tokens) {
+    throw new ApiError("Not authenticated", 401);
+  }
+
+  try {
+    return await apiPost<T>(path, { token: tokens.access_token, body });
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      const refreshed = await refreshTokens();
+      if (refreshed) {
+        return await apiPost<T>(path, { token: refreshed.access_token, body });
       }
     }
     throw err;
