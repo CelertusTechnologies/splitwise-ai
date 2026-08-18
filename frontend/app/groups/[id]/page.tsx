@@ -334,9 +334,13 @@ function AddExpenseForm({
         setFormError("Enter an amount greater than zero for every selected participant.");
         return null;
       }
-      const sum = amounts.reduce((a, b) => a + b, 0);
-      if (Math.abs(sum - totalAmount) > 0.01) {
-        setFormError(`The amounts must add up to ${formatINR(totalAmount)} (currently ${formatINR(sum)}).`);
+      // Compare in minor units (paise), the same way the backend does, so a
+      // borderline case like 33.33 + 33.33 + 33.33 (= 99.99, not 100) is
+      // caught here instead of round-tripping to a confusing server error.
+      const totalMinor = Math.round(totalAmount * 100);
+      const sumMinor = amounts.reduce((sum, a) => sum + Math.round(a * 100), 0);
+      if (sumMinor !== totalMinor) {
+        setFormError(`The amounts must add up to exactly ${formatINR(totalAmount)} (currently ${formatINR(sumMinor / 100)}).`);
         return null;
       }
       return selected.map((m, i) => ({ user_id: m.user_id, amount: amounts[i] }));
@@ -348,9 +352,14 @@ function AddExpenseForm({
         setFormError("Enter a percentage for every selected participant.");
         return null;
       }
-      const sum = percentages.reduce((a, b) => a + b, 0);
-      if (Math.abs(sum - 100) > 0.01) {
-        setFormError(`The percentages must add up to 100 (currently ${sum}).`);
+      // Compare in basis points, the same way the backend does, so a
+      // borderline case like 33.33 + 33.33 + 33.33 (= 99.99%, not 100%) is
+      // caught here instead of round-tripping to a confusing server error.
+      const bpsSum = percentages.reduce((sum, p) => sum + Math.round(p * 100), 0);
+      if (bpsSum !== 10000) {
+        setFormError(
+          `The percentages must add up to exactly 100% (currently ${(bpsSum / 100).toFixed(2)}%). Try adjusting one, e.g. 33.34 instead of 33.33.`
+        );
         return null;
       }
       return selected.map((m, i) => ({ user_id: m.user_id, percentage: percentages[i] }));
