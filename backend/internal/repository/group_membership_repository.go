@@ -13,6 +13,7 @@ type GroupMembershipRepository interface {
 	Create(ctx context.Context, m *groupdomain.Membership) error
 	FindActive(ctx context.Context, groupID, userID uuid.UUID) (*groupdomain.Membership, error)
 	ListActiveGroupIDsForUser(ctx context.Context, userID uuid.UUID) ([]uuid.UUID, error)
+	ListActiveByGroup(ctx context.Context, groupID uuid.UUID) ([]groupdomain.Membership, error)
 	CountActive(ctx context.Context, groupID uuid.UUID) (int64, error)
 }
 
@@ -46,6 +47,15 @@ func (r *GormGroupMembershipRepository) ListActiveGroupIDsForUser(ctx context.Co
 		Where("user_id = ? AND status = ?", userID, groupdomain.MembershipStatusActive).
 		Pluck("group_id", &ids).Error
 	return ids, err
+}
+
+func (r *GormGroupMembershipRepository) ListActiveByGroup(ctx context.Context, groupID uuid.UUID) ([]groupdomain.Membership, error) {
+	var found []groupdomain.Membership
+	err := r.db.WithContext(ctx).
+		Where("group_id = ? AND status = ?", groupID, groupdomain.MembershipStatusActive).
+		Order("joined_at ASC").
+		Find(&found).Error
+	return found, err
 }
 
 func (r *GormGroupMembershipRepository) CountActive(ctx context.Context, groupID uuid.UUID) (int64, error) {

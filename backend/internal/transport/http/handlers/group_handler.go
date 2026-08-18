@@ -132,6 +132,37 @@ func (h *GroupHandler) Get(c *gin.Context) {
 	response.OK(c, gin.H{"group": toGroupResponse(*found, membership.Role)})
 }
 
+type memberResponse struct {
+	UserID   string `json:"user_id"`
+	FullName string `json:"full_name"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+}
+
+func (h *GroupHandler) ListMembers(c *gin.Context) {
+	userID, ok := requireUserID(c)
+	if !ok {
+		return
+	}
+
+	groupID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "validation_failed", "invalid group id")
+		return
+	}
+
+	found, err := h.groups.ListMembers(c.Request.Context(), userID, groupID)
+	if writeGroupServiceError(c, err) {
+		return
+	}
+
+	items := make([]memberResponse, 0, len(found))
+	for _, m := range found {
+		items = append(items, memberResponse{UserID: m.UserID.String(), FullName: m.FullName, Email: m.Email, Role: m.Role})
+	}
+	response.OK(c, gin.H{"members": items})
+}
+
 func (h *GroupHandler) CreateInvite(c *gin.Context) {
 	userID, ok := requireUserID(c)
 	if !ok {

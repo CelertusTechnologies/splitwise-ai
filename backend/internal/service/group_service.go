@@ -25,14 +25,23 @@ type GroupService struct {
 	groups      repository.GroupRepository
 	memberships repository.GroupMembershipRepository
 	invites     repository.GroupInviteRepository
+	users       repository.UserRepository
 }
 
 func NewGroupService(
 	groups repository.GroupRepository,
 	memberships repository.GroupMembershipRepository,
 	invites repository.GroupInviteRepository,
+	users repository.UserRepository,
 ) *GroupService {
-	return &GroupService{groups: groups, memberships: memberships, invites: invites}
+	return &GroupService{groups: groups, memberships: memberships, invites: invites, users: users}
+}
+
+type MemberInfo struct {
+	UserID   uuid.UUID
+	FullName string
+	Email    string
+	Role     string
 }
 
 type CreateGroupInput struct {
@@ -114,6 +123,33 @@ func (s *GroupService) GetGroup(ctx context.Context, userID, groupID uuid.UUID) 
 	}
 
 	return found, membership, nil
+}
+
+func (s *GroupService) ListMembers(ctx context.Context, requesterID, groupID uuid.UUID) ([]MemberInfo, error) {
+	if _, err := s.memberships.FindActive(ctx, groupID, requesterID); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrNotAMember
+		}
+		return nil, err
+	}
+
+	memberships, err := s.memberships.ListActiveByGroup(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+
+	members := make([]MemberInfo, 0, len(memberships))
+	for _, m := range memberships {
+		user, err := s.users.FindByID(ctx, m.UserID)
+		if errors.Is(err, repository.ErrNotFound) {
+			continue // shouldn't happen, but don't fail the whole list over one stale row
+		}
+		if err != nil {
+			return nil, err
+		}
+		members = append(members, MemberInfo{UserID: user.ID, FullName: user.FullName, Email: user.Email, Role: m.Role})
+	}
+	return members, nil
 }
 
 func (s *GroupService) CreateInvite(ctx context.Context, userID, groupID uuid.UUID) (*groupdomain.Invite, error) {

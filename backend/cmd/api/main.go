@@ -63,10 +63,14 @@ func main() {
 	groupMembershipRepo := repository.NewGroupMembershipRepository(db)
 	groupInviteRepo := repository.NewGroupInviteRepository(db)
 	phoneOTPRepo := repository.NewPhoneOTPRepository(db)
+	expenseRepo := repository.NewExpenseRepository(db)
+	expenseShareRepo := repository.NewExpenseShareRepository(db)
+	expenseCategoryRepo := repository.NewExpenseCategoryRepository(db)
 
 	authService := service.NewAuthService(cfg, userRepo, refreshTokenRepo, oneTimeTokenRepo, jwtManager)
-	groupService := service.NewGroupService(groupRepo, groupMembershipRepo, groupInviteRepo)
+	groupService := service.NewGroupService(groupRepo, groupMembershipRepo, groupInviteRepo, userRepo)
 	phoneOTPService := service.NewPhoneOTPService(cfg, userRepo, phoneOTPRepo, authService)
+	expenseService := service.NewExpenseService(groupRepo, groupMembershipRepo, expenseCategoryRepo, expenseRepo, expenseShareRepo)
 
 	router := httptransport.NewRouter(httptransport.RouterDeps{
 		Config:          cfg,
@@ -77,6 +81,7 @@ func main() {
 		HealthHandler:   handlers.NewHealthHandler(db, redisClient),
 		GroupHandler:    handlers.NewGroupHandler(groupService, cfg.FrontendURL),
 		PhoneOTPHandler: handlers.NewPhoneOTPHandler(phoneOTPService),
+		ExpenseHandler:  handlers.NewExpenseHandler(expenseService),
 	})
 
 	logger.Info("starting api", zap.String("port", cfg.Port))

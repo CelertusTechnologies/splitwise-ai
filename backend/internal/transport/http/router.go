@@ -18,6 +18,7 @@ type RouterDeps struct {
 	HealthHandler   *handlers.HealthHandler
 	GroupHandler    *handlers.GroupHandler
 	PhoneOTPHandler *handlers.PhoneOTPHandler
+	ExpenseHandler  *handlers.ExpenseHandler
 }
 
 func NewRouter(deps RouterDeps) *gin.Engine {
@@ -66,7 +67,23 @@ func NewRouter(deps RouterDeps) *gin.Engine {
 			groups.GET("", deps.GroupHandler.List)
 			groups.POST("/join", deps.GroupHandler.Join)
 			groups.GET("/:id", deps.GroupHandler.Get)
+			groups.GET("/:id/members", deps.GroupHandler.ListMembers)
 			groups.POST("/:id/invites", deps.GroupHandler.CreateInvite)
+			groups.POST("/:id/expenses", deps.ExpenseHandler.Create)
+			groups.GET("/:id/expenses", deps.ExpenseHandler.List)
+			groups.GET("/:id/balances", deps.ExpenseHandler.Balances)
+		}
+
+		expenses := v1.Group("/expenses")
+		expenses.Use(middleware.AuthRequired(deps.JWTManager))
+		{
+			expenses.DELETE("/:id", deps.ExpenseHandler.Delete)
+		}
+
+		expenseCategories := v1.Group("/expense-categories")
+		expenseCategories.Use(middleware.AuthRequired(deps.JWTManager))
+		{
+			expenseCategories.GET("", deps.ExpenseHandler.ListCategories)
 		}
 	}
 
