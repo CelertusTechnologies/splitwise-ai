@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -47,13 +48,20 @@ type expenseResponse struct {
 	Description  *string   `json:"description"`
 	Amount       float64   `json:"amount"`
 	Currency     string    `json:"currency"`
+	CategorySlug *string   `json:"category_slug"`
 	SplitMethod  string    `json:"split_method"`
 	PaidByUserID string    `json:"paid_by_user_id"`
 	ExpenseDate  string    `json:"expense_date"`
 	CreatedAt    time.Time `json:"created_at"`
 }
 
-func toExpenseResponse(e expensedomain.Expense) expenseResponse {
+func toExpenseResponse(e expensedomain.Expense, categorySlugByID map[uuid.UUID]string) expenseResponse {
+	var categorySlug *string
+	if e.CategoryID != nil {
+		if slug, ok := categorySlugByID[*e.CategoryID]; ok {
+			categorySlug = &slug
+		}
+	}
 	return expenseResponse{
 		ID:           e.ID.String(),
 		GroupID:      e.GroupID.String(),
@@ -61,11 +69,27 @@ func toExpenseResponse(e expensedomain.Expense) expenseResponse {
 		Description:  e.Description,
 		Amount:       minorToAmount(e.AmountMinor),
 		Currency:     e.Currency,
+		CategorySlug: categorySlug,
 		SplitMethod:  e.SplitMethod,
 		PaidByUserID: e.PaidByUserID.String(),
 		ExpenseDate:  e.ExpenseDate.Format("2006-01-02"),
 		CreatedAt:    e.CreatedAt,
 	}
+}
+
+// categorySlugByID builds a lookup of category ID to slug so list/create
+// responses can report which category an expense belongs to without
+// changing what the domain model or split-calculation service store.
+func (h *ExpenseHandler) categorySlugByID(ctx context.Context) (map[uuid.UUID]string, error) {
+	categories, err := h.expenses.ListCategories(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byID := make(map[uuid.UUID]string, len(categories))
+	for _, cat := range categories {
+		byID[cat.ID] = cat.Slug
+	}
+	return byID, nil
 }
 
 func minorToAmount(minor int64) float64 {
@@ -146,7 +170,13 @@ func (h *ExpenseHandler) Create(c *gin.Context) {
 		return
 	}
 
-	response.Created(c, gin.H{"expense": toExpenseResponse(*created)})
+	categorySlugByID, err := h.categorySlugByID(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "internal_error", "Could not load categories.")
+		return
+	}
+
+	response.Created(c, gin.H{"expense": toExpenseResponse(*created, categorySlugByID)})
 }
 
 func (h *ExpenseHandler) List(c *gin.Context) {
@@ -166,9 +196,15 @@ func (h *ExpenseHandler) List(c *gin.Context) {
 		return
 	}
 
+	categorySlugByID, err := h.categorySlugByID(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "internal_error", "Could not load categories.")
+		return
+	}
+
 	items := make([]expenseResponse, 0, len(found))
 	for _, e := range found {
-		items = append(items, toExpenseResponse(e))
+		items = append(items, toExpenseResponse(e, categorySlugByID))
 	}
 	response.OK(c, gin.H{"expenses": items})
 }

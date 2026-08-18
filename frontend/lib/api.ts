@@ -88,6 +88,25 @@ export async function apiGet<T>(path: string, token?: string): Promise<T> {
   return payload as T;
 }
 
+export async function apiDelete<T>(path: string, token?: string): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined
+  });
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = payload?.error?.message ?? "Request failed";
+    throw new ApiError(message, response.status);
+  }
+
+  return payload as T;
+}
+
 async function refreshTokens(): Promise<Tokens | null> {
   const tokens = getTokens();
   if (!tokens) return null;
@@ -144,6 +163,29 @@ export async function apiPostAuthed<T>(path: string, body?: unknown): Promise<T>
       const refreshed = await refreshTokens();
       if (refreshed) {
         return await apiPost<T>(path, { token: refreshed.access_token, body });
+      }
+    }
+    throw err;
+  }
+}
+
+/**
+ * DELETE a protected endpoint using the stored access token, transparently
+ * refreshing and retrying once if the access token has expired.
+ */
+export async function apiDeleteAuthed<T>(path: string): Promise<T> {
+  const tokens = getTokens();
+  if (!tokens) {
+    throw new ApiError("Not authenticated", 401);
+  }
+
+  try {
+    return await apiDelete<T>(path, tokens.access_token);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      const refreshed = await refreshTokens();
+      if (refreshed) {
+        return await apiDelete<T>(path, refreshed.access_token);
       }
     }
     throw err;
